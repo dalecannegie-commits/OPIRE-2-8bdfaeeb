@@ -8,18 +8,20 @@ jobs:
   check-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Check for Python tests
         run: |
-          ls -la tests/
-          ls -la *_test.py
+          ls -la tests/ || true
+          ls -la *_test.py || true
 
       - name: Check for Node.js tests
         run: |
-          cat package.json | grep -A 5 '"test"'
-          ls -la __tests__/ test/
+          if [ -f package.json ]; then
+            cat package.json | grep -A 5 '"test"' || true
+          fi
+          ls -la __tests__/ test/ || true
 
       - name: Check for Go tests
         run: |
-          ls -la *_test.go
+          ls -la *_test.go || true
