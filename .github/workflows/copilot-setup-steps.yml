@@ -1,27 +1,65 @@
-name: Check Tests
+name: Run Tests
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  check-tests:
+  test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check for Python tests
-        run: |
-          ls -la tests/ || true
-          ls -la *_test.py || true
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
 
-      - name: Check for Node.js tests
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Install dependencies
         run: |
-          if [ -f package.json ]; then
-            cat package.json | grep -A 5 '"test"' || true
+          npm install || true
+          pip install -r requirements.txt 2>/dev/null || true
+
+      - name: Run Python tests
+        run: |
+          if [ -d tests/ ]; then
+            python -m pytest tests/ -v
+          elif ls *_test.py 1> /dev/null 2>&1; then
+            python -m pytest *_test.py -v
+          else
+            echo "No Python tests found"
           fi
-          ls -la __tests__/ test/ || true
+        continue-on-error: true
 
-      - name: Check for Go tests
+      - name: Run Node.js tests
         run: |
-          ls -la *_test.go || true
+          if grep -q '"test"' package.json 2>/dev/null; then
+            npm test
+          else
+            echo "No npm test script found"
+          fi
+        continue-on-error: true
+
+      - name: Run Go tests
+        run: |
+          if ls *_test.go 1> /dev/null 2>&1; then
+            go test ./... -v
+          else
+            echo "No Go tests found"
+          fi
+        continue-on-error: true
