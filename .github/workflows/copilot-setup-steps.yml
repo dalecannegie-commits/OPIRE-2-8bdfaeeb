@@ -3,63 +3,92 @@ name: Run Tests
 on:
   push:
     branches: [ main ]
+  pull_request:
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
+    defaults:
+      run:
+        shell: bash
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+      - name: Detect Python tests
+        id: python
+        run: |
+          shopt -s nullglob
+          if [ -f requirements.txt ] || [ -f pyproject.toml ] || [ -d tests ] || ls *_test.py 1>/dev/null 2>&1; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Detect Node tests
+        id: node
+        run: |
+          if [ -f package.json ] && node -p "require('./package.json').scripts && require('./package.json').scripts.test" >/dev/null 2>&1; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Detect Go tests
+        id: go
+        run: |
+          shopt -s nullglob
+          if ls *_test.go 1>/dev/null 2>&1; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        if: steps.python.outputs.enabled == 'true'
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
 
+      - name: Install Python dependencies
+        if: steps.python.outputs.enabled == 'true'
+        run: |
+          if [ -f requirements.txt ]; then
+            python -m pip install --upgrade pip
+            python -m pip install -r requirements.txt
+          fi
+
+      - name: Run Python tests
+        if: steps.python.outputs.enabled == 'true'
+        run: |
+          if [ -d tests ]; then
+            python -m pytest tests -v
+          else
+            python -m pytest *_test.py -v
+          fi
+
+      - name: Set up Node.js
+        if: steps.node.outputs.enabled == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Node dependencies
+        if: steps.node.outputs.enabled == 'true'
+        run: npm install
+
+      - name: Run Node.js tests
+        if: steps.node.outputs.enabled == 'true'
+        run: npm test
+
       - name: Set up Go
-        uses: actions/setup-go@v4
+        if: steps.go.outputs.enabled == 'true'
+        uses: actions/setup-go@v5
         with:
           go-version: '1.21'
 
-      - name: Install dependencies
-        run: |
-          npm install || true
-          pip install -r requirements.txt 2>/dev/null || true
-
-      - name: Run Python tests
-        run: |
-          if [ -d tests/ ]; then
-            python -m pytest tests/ -v
-          elif ls *_test.py 1> /dev/null 2>&1; then
-            python -m pytest *_test.py -v
-          else
-            echo "No Python tests found"
-          fi
-        continue-on-error: true
-
-      - name: Run Node.js tests
-        run: |
-          if grep -q '"test"' package.json 2>/dev/null; then
-            npm test
-          else
-            echo "No npm test script found"
-          fi
-        continue-on-error: true
-
       - name: Run Go tests
-        run: |
-          if ls *_test.go 1> /dev/null 2>&1; then
-            go test ./... -v
-          else
-            echo "No Go tests found"
-          fi
-        continue-on-error: true
+        if: steps.go.outputs.enabled == 'true'
+        run: go test ./... -v
