@@ -19,7 +19,7 @@ jobs:
         id: python
         run: |
           shopt -s nullglob
-          if [ -f requirements.txt ] || [ -f pyproject.toml ] || [ -d tests ] || ls *_test.py 1>/dev/null 2>&1; then
+          if [ -f pyproject.toml ] || [ -d tests ] || ls *_test.py 1>/dev/null 2>&1; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
