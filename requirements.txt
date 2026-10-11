@@ -1,0 +1,7 @@
+# Python dependencies for OPIRE-2
+# Add the exact package(s) needed for the GPT-6 Sol model here.
+# If you know the package name, replace the placeholder below.
+# Example:
+# gpt-6-sol
+
+# Keep this file valid for pip even when no package is installed yet.
